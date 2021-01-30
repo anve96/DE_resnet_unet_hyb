@@ -5,7 +5,17 @@ import argparse
 import time
 import image_utils
 from network import ResnetUnetHybrid
+from flask import Flask,render_template,Response
 
+app=Flask(__name__)
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+@app.route("/video_feed")
+def video_feed():
+    args= get_arguments()
+    return Response(run_vid(args.input_path), mimetype = "multipart/x-mixed-replace; boundary=frame")
 
 def run_vid(input_path):
     """Load, transform and inference the frames of a video. Display the predictions with the input frames."""
@@ -55,7 +65,11 @@ def run_vid(input_path):
         pred = image_utils.depth_to_grayscale(pred)
 
         # concatenate the input frame with the prediction and display
-        cv2.imshow('video', np.concatenate((frame[..., ::-1], pred), axis=1))
+        #cv2.imshow('video', np.concatenate((frame[..., ::-1], pred), axis=1))
+        ret, buffer = cv2.imencode(".jpg", pred)
+        pred = buffer.tobytes()
+        yield (b"--frame\r\n"
+               b"Content-Type: image/jpeg\r\n\r\n" + pred + b"\r\n")
 
     end = time.time()
     print('\n{} frames evaluated in {:.3f}s'.format(int(frame_cnt), end-start))
@@ -78,4 +92,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    app.run(debug=True)
